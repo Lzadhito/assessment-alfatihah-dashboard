@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Evaluations\Schemas;
 
 use App\Models\Evaluation;
 use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
@@ -189,12 +190,13 @@ class EvaluationSchema
             Section::make('Data Peserta')
                 ->columnSpanFull()
                 ->schema([
-                    Select::make('user_id')
+                    TextInput::make('nama_lengkap')
                         ->label('Nama Peserta')
-                        ->relationship('user', 'nama_lengkap')
-                        ->searchable()
-                        ->preload()
+                        ->placeholder('Masukkan nama lengkap peserta')
+                        ->required()
                         ->columnSpanFull(),
+
+                    Hidden::make('user_id'),
 
                     TextInput::make('pemeriksa')
                         ->label('Pemeriksa')
