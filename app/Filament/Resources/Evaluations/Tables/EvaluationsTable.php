@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Filament\Resources\EvaluasiPerAyats\Tables;
+namespace App\Filament\Resources\Evaluations\Tables;
 
-use App\Models\EvaluasiPerAyat;
+use App\Models\Evaluation;
 use Filament\Forms\Components\TextInput;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -10,7 +10,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
-class EvaluasiPerAyatsTable
+class EvaluationsTable
 {
     public static function configure(Table $table): Table
     {
@@ -52,15 +52,15 @@ class EvaluasiPerAyatsTable
                     ->modifyQueryUsing(function (Builder $query, array $data): Builder {
                         return $query->when(
                             filled($data['nama_lengkap']),
-                            fn(Builder $q) => $q->whereHas(
+                            fn (Builder $q) => $q->whereHas(
                                 'user',
-                                fn(Builder $u) => $u->where('nama_lengkap', 'like', "%{$data['nama_lengkap']}%"),
+                                fn (Builder $u) => $u->where('nama_lengkap', 'like', "%{$data['nama_lengkap']}%"),
                             ),
                         );
                     })
                     ->indicateUsing(function (array $data): ?string {
                         if (filled($data['nama_lengkap'])) {
-                            return 'Nama: ' . $data['nama_lengkap'];
+                            return 'Nama: '.$data['nama_lengkap'];
                         }
 
                         return null;
@@ -69,7 +69,7 @@ class EvaluasiPerAyatsTable
                 SelectFilter::make('pemeriksa')
                     ->label('Pemeriksa')
                     ->options(
-                        fn() => EvaluasiPerAyat::query()
+                        fn () => Evaluation::query()
                             ->whereNotNull('pemeriksa')
                             ->distinct()
                             ->orderBy('pemeriksa')
@@ -81,7 +81,7 @@ class EvaluasiPerAyatsTable
                 SelectFilter::make('kegiatan')
                     ->label('Kegiatan')
                     ->options(
-                        fn() => EvaluasiPerAyat::query()
+                        fn () => Evaluation::query()
                             ->whereNotNull('kegiatan')
                             ->distinct()
                             ->orderBy('kegiatan')
@@ -99,12 +99,12 @@ class EvaluasiPerAyatsTable
                     ->modifyQueryUsing(function (Builder $query, array $data): Builder {
                         return $query->when(
                             filled($data['kode_unik']),
-                            fn(Builder $q) => $q->where('kode_unik', 'like', "%{$data['kode_unik']}%"),
+                            fn (Builder $q) => $q->where('kode_unik', 'like', "%{$data['kode_unik']}%"),
                         );
                     })
                     ->indicateUsing(function (array $data): ?string {
                         if (filled($data['kode_unik'])) {
-                            return 'Kode Unik: ' . $data['kode_unik'];
+                            return 'Kode Unik: '.$data['kode_unik'];
                         }
 
                         return null;

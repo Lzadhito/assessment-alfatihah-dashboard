@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\EvaluasiPerAyat;
+use App\Models\Evaluation;
 use App\Models\User;
 use Illuminate\Support\Str;
 
@@ -29,7 +29,7 @@ it('stores evaluasi per ayat with json payloads', function () {
 
     $payload = ['score' => 5, 'notes' => 'baik'];
 
-    $evaluation = EvaluasiPerAyat::create([
+    $evaluation = Evaluation::create([
         'user_id' => $user->id,
         'pemeriksa' => 'Ustadzah A',
         'kode_unik' => 'KDG-01',
