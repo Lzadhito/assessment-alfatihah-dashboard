@@ -1,11 +1,64 @@
-import { Head, Link } from '@inertiajs/react';
-import { index } from '@/actions/App/Http/Controllers/EvaluationController';
-import { Badge } from '@/components/ui/badge';
+import { Head } from '@inertiajs/react';
+import {
+    Chart as ChartJS,
+    Filler,
+    Legend,
+    LineElement,
+    PointElement,
+    RadialLinearScale,
+    Tooltip,
+    type AnimationEvent,
+} from 'chart.js';
+import { format } from 'date-fns';
+import { id as localeId } from 'date-fns/locale';
+import {
+    ChevronDown,
+    ChevronRight,
+    Download,
+    MoreVertical,
+} from 'lucide-react';
+import { useState } from 'react';
+import { Radar } from 'react-chartjs-2';
+
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EVALUATION_OPTION_KEYS, UNIQUE_CODE_LENGTH } from '@/constants';
+import { generateFilename, generatePDF } from '@/lib/pdf-generator';
+import { getToneColor } from '@/lib/scoring';
+import { cn, snakeCaseToTitleCase } from '@/lib/utils';
+
+ChartJS.register(
+    RadialLinearScale,
+    PointElement,
+    LineElement,
+    Filler,
+    Tooltip,
+    Legend,
+);
 
 type AyatErrors = {
     jaliy: string[];
     khafiy: string[];
+};
+
+type ScoreLabel = {
+    title: string;
+    description: string;
+    tone: string;
+};
+
+type Scores = Record<string, number> & {
+    minScore: {
+        score: number;
+        label: ScoreLabel;
+    };
 };
 
 type Evaluation = {
@@ -25,196 +78,437 @@ type Evaluation = {
     ayat_6: AyatErrors | null;
     ayat_7: AyatErrors | null;
     ayat_7_part_2: AyatErrors | null;
+    scores: Scores;
 };
 
 type Props = {
     evaluation: Evaluation;
 };
 
-const AYAT_LABELS: Record<string, string> = {
-    ayat_1: 'Ayat 1 – بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ',
-    ayat_2: 'Ayat 2 – الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ',
-    ayat_3: 'Ayat 3 – الرَّحْمَنِ الرَّحِيمِ',
-    ayat_4: 'Ayat 4 – مَالِكِ يَوْمِ الدِّينِ',
-    ayat_5: 'Ayat 5 – إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ',
-    ayat_6: 'Ayat 6 – اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ',
-    ayat_7: 'Ayat 7 (Bagian 1) – صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ',
-    ayat_7_part_2:
-        'Ayat 7 (Bagian 2) – غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ',
-};
-
-const AYAT_KEYS = Object.keys(AYAT_LABELS) as (keyof Evaluation)[];
-
 export default function Results({ evaluation }: Props) {
-    const hasAnyErrors = AYAT_KEYS.some((key) => {
-        const ayat = evaluation[key] as AyatErrors | null;
-        return (
-            (ayat?.jaliy?.length ?? 0) > 0 || (ayat?.khafiy?.length ?? 0) > 0
-        );
-    });
+    const [, setChartBase64] = useState<string>('');
+    const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+        new Set(EVALUATION_OPTION_KEYS),
+    );
+
+    const toggleCategory = (category: string) => {
+        const newExpanded = new Set(expandedCategories);
+        if (newExpanded.has(category)) {
+            newExpanded.delete(category);
+        } else {
+            newExpanded.add(category);
+        }
+        setExpandedCategories(newExpanded);
+    };
+
+    const handleDownloadPDF = async () => {
+        try {
+            const filename = generateFilename(
+                evaluation.nama_lengkap,
+                evaluation.created_at
+                    ? new Date(evaluation.created_at)
+                          .toISOString()
+                          .split('T')[0]
+                    : undefined,
+            );
+            await generatePDF('evaluation-content', {
+                filename,
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+            });
+        } catch (error) {
+            console.error('PDF generation failed:', error);
+        }
+    };
+
+    const pageTitle = `${evaluation.nama_lengkap ?? 'Peserta'} - ${format(
+        evaluation.created_at ? new Date(evaluation.created_at) : new Date(),
+        'dd MMMM yyyy',
+        { locale: localeId },
+    )}`;
+
+    const chartData = {
+        labels: EVALUATION_OPTION_KEYS.map((ayat) =>
+            snakeCaseToTitleCase(ayat),
+        ),
+        datasets: [
+            {
+                label: `Skor terendah peserta: ${evaluation.scores?.minScore?.score}/5`,
+                data: EVALUATION_OPTION_KEYS.map(
+                    (ayat) => (evaluation.scores?.[ayat] as number) ?? 0,
+                ),
+                backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                borderColor: 'rgba(34, 197, 94, 1)',
+                borderWidth: 2,
+                pointRadius: 1.5,
+            },
+            {
+                label: 'Skor terendah yang tergolong aman: 3/5',
+                data: EVALUATION_OPTION_KEYS.map(() => 3),
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 1,
+                borderDash: [5, 5],
+                pointRadius: 0,
+            },
+        ],
+    };
+
+    const chartOptions = {
+        animation: {
+            onComplete(event: AnimationEvent) {
+                setChartBase64(event.chart.toBase64Image());
+            },
+        },
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            r: {
+                beginAtZero: true,
+                max: 5,
+                ticks: {
+                    stepSize: 1,
+                    callback: function (value: number | string) {
+                        return Math.floor(Number(value));
+                    },
+                },
+            },
+        },
+        plugins: {
+            legend: {
+                position: 'bottom' as const,
+            },
+        },
+    };
+
+    const ayatEvaluations = {
+        ayat_1: evaluation.ayat_1,
+        ayat_2: evaluation.ayat_2,
+        ayat_3: evaluation.ayat_3,
+        ayat_4: evaluation.ayat_4,
+        ayat_5: evaluation.ayat_5,
+        ayat_6: evaluation.ayat_6,
+        ayat_7: evaluation.ayat_7,
+        ayat_7_part_2: evaluation.ayat_7_part_2,
+    };
 
     return (
-        <>
-            <Head title={`Hasil – ${evaluation.nama_lengkap ?? 'Peserta'}`} />
+        <div>
+            <Head title={pageTitle} />
 
-            <div className="min-h-screen bg-background px-4 py-10">
-                <div className="mx-auto max-w-2xl space-y-6">
-                    {/* Header */}
-                    <div className="flex items-start justify-between gap-4">
-                        <div>
-                            <h1 className="text-2xl font-bold">
-                                Hasil Evaluasi
-                            </h1>
-                            <p className="text-sm text-muted-foreground">
-                                Kode:{' '}
-                                <span className="font-mono font-medium">
-                                    {evaluation.kode_unik}
-                                </span>
-                            </p>
-                        </div>
-                        <Button variant="outline" size="sm" asChild>
-                            <Link href={index()}>Kembali</Link>
-                        </Button>
-                    </div>
-
-                    {/* Info Card */}
-                    <div className="space-y-3 rounded-xl border bg-card p-6">
-                        <h2 className="text-base font-semibold">
-                            Informasi Peserta
-                        </h2>
-                        <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                            <div>
-                                <dt className="text-muted-foreground">
-                                    Nama Lengkap
-                                </dt>
-                                <dd className="font-medium">
-                                    {evaluation.nama_lengkap ?? '-'}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt className="text-muted-foreground">
-                                    Jenis Kelamin
-                                </dt>
-                                <dd className="font-medium">
-                                    {evaluation.asal_halaqah ?? '-'}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt className="text-muted-foreground">
-                                    Kegiatan
-                                </dt>
-                                <dd className="font-medium">
-                                    {evaluation.kegiatan ?? '-'}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt className="text-muted-foreground">
-                                    Pemeriksa
-                                </dt>
-                                <dd className="font-medium">
-                                    {evaluation.pemeriksa ?? '-'}
-                                </dd>
-                            </div>
-                        </dl>
-                    </div>
-
-                    {/* Recommendation */}
-                    {evaluation.rekomendasi_program && (
-                        <div className="flex items-center justify-between gap-4 rounded-xl border bg-card p-6">
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Rekomendasi Program
-                                </p>
-                                <p className="mt-0.5 text-base font-semibold">
-                                    {evaluation.rekomendasi_program}
-                                </p>
-                            </div>
-                            <Badge
-                                variant="secondary"
-                                className="whitespace-nowrap"
+            <section className="p-4 pb-0 lg:p-8 lg:pb-0">
+                <div className="flex justify-end gap-2">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                aria-label="More actions"
                             >
-                                {evaluation.rekomendasi_program}
-                            </Badge>
-                        </div>
-                    )}
-
-                    {/* Ayat Errors */}
-                    <div className="space-y-4">
-                        <h2 className="text-base font-semibold">
-                            Detail Kesalahan per Ayat
-                        </h2>
-
-                        {!hasAnyErrors && (
-                            <div className="rounded-xl border bg-card p-6 text-center text-sm text-muted-foreground">
-                                Tidak ada kesalahan yang tercatat.
-                            </div>
-                        )}
-
-                        {AYAT_KEYS.map((key) => {
-                            const ayat = evaluation[key] as AyatErrors | null;
-                            const jaliyCount = ayat?.jaliy?.length ?? 0;
-                            const khafiyCount = ayat?.khafiy?.length ?? 0;
-
-                            if (jaliyCount === 0 && khafiyCount === 0)
-                                return null;
-
-                            return (
-                                <div
-                                    key={key}
-                                    className="space-y-4 rounded-xl border bg-card p-6"
+                                <MoreVertical className="h-5 w-5" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48 p-1">
+                            <DropdownMenuItem asChild>
+                                <Button
+                                    variant="ghost"
+                                    className="w-full justify-start"
+                                    onClick={handleDownloadPDF}
                                 >
-                                    <h3
-                                        className="text-sm leading-relaxed font-medium"
-                                        dir="auto"
-                                    >
-                                        {AYAT_LABELS[key]}
-                                    </h3>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    PDF
+                                </Button>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </section>
 
-                                    {jaliyCount > 0 && (
-                                        <div className="space-y-2">
-                                            <p className="text-xs font-semibold tracking-wide text-destructive uppercase">
-                                                Kesalahan Jaliy (Jelas)
-                                            </p>
-                                            <ul className="space-y-1">
-                                                {ayat!.jaliy.map((error, i) => (
-                                                    <li
-                                                        key={i}
-                                                        className="flex gap-2 text-sm text-foreground/80"
-                                                    >
-                                                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
-                                                        {error}
-                                                    </li>
-                                                ))}
-                                            </ul>
+            <main
+                id="evaluation-content"
+                className="container mx-auto space-y-8 p-4 lg:p-8"
+            >
+                {/* Header */}
+                <header className="flex gap-4">
+                    <img
+                        className="h-22 w-22 rounded-lg"
+                        src="/logo.jpg"
+                        alt="Logo"
+                    />
+                    <div>
+                        <h1 className="text-3xl font-semibold tracking-tight text-pretty">
+                            Report Assessment Al-Fatihah
+                        </h1>
+                        <div className="text-sm text-gray-600">
+                            Muhajir Project Tilawah
+                        </div>
+                    </div>
+                </header>
+
+                {/* Participant Info */}
+                <Card className="mb-6">
+                    <CardContent className="flex flex-col items-start justify-between lg:flex-row lg:items-center">
+                        <div>
+                            <p className="text-lg font-semibold">
+                                {evaluation.nama_lengkap ||
+                                    evaluation.kode_unik.slice(
+                                        0,
+                                        UNIQUE_CODE_LENGTH,
+                                    ) ||
+                                    '-'}
+                            </p>
+                            {evaluation.kegiatan && (
+                                <h2 className="text-sm tracking-wide text-gray-500 uppercase">
+                                    {evaluation.kegiatan}
+                                </h2>
+                            )}
+                            {evaluation.pemeriksa && (
+                                <h2 className="text-xs tracking-wide text-gray-500 uppercase">
+                                    Diperiksa oleh: {evaluation.pemeriksa}
+                                </h2>
+                            )}
+                        </div>
+                        <p className="text-lg font-semibold">
+                            {format(
+                                evaluation.created_at
+                                    ? new Date(evaluation.created_at)
+                                    : new Date(),
+                                'dd MMMM yyyy',
+                                { locale: localeId },
+                            )}
+                        </p>
+                    </CardContent>
+                </Card>
+
+                {/* Score Card + Radar Chart */}
+                <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <Card
+                        className={cn(
+                            getToneColor(
+                                evaluation.scores?.minScore?.label?.tone,
+                            ),
+                        )}
+                    >
+                        <CardContent>
+                            <div className="mb-2 text-5xl font-bold">
+                                {evaluation.scores?.minScore?.score} / 5
+                            </div>
+                            <div className="mb-4 text-sm">Status:</div>
+                            <div className="text-lg font-semibold">
+                                {evaluation.scores?.minScore?.label?.title}
+                            </div>
+                            {evaluation.scores?.minScore?.label
+                                ?.description && (
+                                <div className="mt-1 text-sm">
+                                    {
+                                        evaluation.scores.minScore.label
+                                            .description
+                                    }
+                                </div>
+                            )}
+                            {evaluation.rekomendasi_program && (
+                                <div className="mt-4 space-y-2 text-sm text-gray-500">
+                                    Alhamdulillah, kamu direkomendasikan untuk
+                                    mengikuti{' '}
+                                    <strong>
+                                        {evaluation.rekomendasi_program}
+                                    </strong>
+                                </div>
+                            )}
+                            <img
+                                src="/qr_linktree.png"
+                                alt="Muhajir Project Tilawah"
+                                className="mx-auto mt-4 w-48"
+                            />
+                            <div className="mt-4 flex w-full items-center justify-center">
+                                <a
+                                    href="https://linktr.ee/Muhajirprojecttilawah"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    <Button>Daftar Sekarang</Button>
+                                </a>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="xl:col-span-2">
+                        <CardContent className="min-h-[50vh] w-full">
+                            <Radar data={chartData} options={chartOptions} />
+                        </CardContent>
+                    </Card>
+                </section>
+
+                {/* Per-Ayat Details */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {Object.keys(ayatEvaluations).map((av) => {
+                        const ayatData =
+                            ayatEvaluations[av as keyof typeof ayatEvaluations];
+                        const isExpanded = expandedCategories.has(av);
+
+                        return (
+                            <Card key={av}>
+                                <div
+                                    className="cursor-pointer p-4 transition-colors hover:bg-gray-50"
+                                    onClick={() => toggleCategory(av)}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex-1">
+                                            <h3 className="text-lg font-semibold">
+                                                {snakeCaseToTitleCase(av)}
+                                            </h3>
                                         </div>
-                                    )}
+                                        <div className="flex items-center gap-3">
+                                            {isExpanded ? (
+                                                <ChevronDown size={20} />
+                                            ) : (
+                                                <ChevronRight size={20} />
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
 
-                                    {khafiyCount > 0 && (
-                                        <div className="space-y-2">
-                                            <p className="text-xs font-semibold tracking-wide text-amber-600 uppercase dark:text-amber-400">
-                                                Kesalahan Khafiy (Tersembunyi)
-                                            </p>
-                                            <ul className="space-y-1">
-                                                {ayat!.khafiy.map(
-                                                    (error, i) => (
-                                                        <li
-                                                            key={i}
-                                                            className="flex gap-2 text-sm text-foreground/80"
-                                                        >
-                                                            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                                                            {error}
-                                                        </li>
-                                                    ),
+                                {isExpanded && (
+                                    <div className="border-t bg-gray-50 px-4 pb-4">
+                                        <div className="pt-4">
+                                            <h4 className="mb-3 text-sm font-medium text-gray-700">
+                                                Khafiy
+                                            </h4>
+                                            <ul className="space-y-2">
+                                                {ayatData?.khafiy?.length ? (
+                                                    ayatData.khafiy.map(
+                                                        (
+                                                            khafiy: string,
+                                                            index: number,
+                                                        ) => (
+                                                            <li
+                                                                key={index}
+                                                                className="flex items-start gap-2 text-sm text-gray-600"
+                                                            >
+                                                                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-500" />
+                                                                <span>
+                                                                    {khafiy}
+                                                                </span>
+                                                            </li>
+                                                        ),
+                                                    )
+                                                ) : (
+                                                    <li className="text-sm text-gray-400">
+                                                        -
+                                                    </li>
                                                 )}
                                             </ul>
                                         </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
+
+                                        <div className="pt-4">
+                                            <h4 className="mb-3 text-sm font-medium text-gray-700">
+                                                Jaliy
+                                            </h4>
+                                            <ul className="space-y-2">
+                                                {ayatData?.jaliy?.length ? (
+                                                    ayatData.jaliy.map(
+                                                        (
+                                                            jaliy: string,
+                                                            index: number,
+                                                        ) => (
+                                                            <li
+                                                                key={index}
+                                                                className="flex items-start gap-2 text-sm text-gray-600"
+                                                            >
+                                                                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-500" />
+                                                                <span>
+                                                                    {jaliy}
+                                                                </span>
+                                                            </li>
+                                                        ),
+                                                    )
+                                                ) : (
+                                                    <li className="text-sm text-gray-400">
+                                                        -
+                                                    </li>
+                                                )}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                )}
+                            </Card>
+                        );
+                    })}
                 </div>
-            </div>
-        </>
+
+                {/* Footer */}
+                <div className="mt-12 text-center text-sm text-gray-500">
+                    © 2026 Muhajir Project Tilawah • Laporan ini bersifat
+                    pendampingan belajar
+                </div>
+            </main>
+        </div>
+    );
+}
+
+export function ResultsLoading() {
+    return (
+        <div>
+            <section className="p-4 pb-0 lg:p-8 lg:pb-0">
+                <div className="flex justify-end gap-2">
+                    <Skeleton className="h-10 w-10" />
+                </div>
+            </section>
+            <main className="container mx-auto space-y-8 p-4 lg:p-8">
+                <header className="flex gap-4">
+                    <Skeleton className="h-22 w-22 rounded-lg" />
+                    <div className="flex-1">
+                        <Skeleton className="mb-2 h-9 w-96" />
+                        <Skeleton className="h-5 w-48" />
+                    </div>
+                </header>
+
+                <Card className="mb-6">
+                    <CardContent className="flex items-start justify-between">
+                        <div className="flex-1">
+                            <Skeleton className="mb-2 h-7 w-48" />
+                            <Skeleton className="h-5 w-32" />
+                        </div>
+                        <Skeleton className="h-7 w-32" />
+                    </CardContent>
+                </Card>
+
+                <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <Card>
+                        <CardContent>
+                            <Skeleton className="mb-2 h-16 w-24" />
+                            <Skeleton className="mb-4 h-5 w-16" />
+                            <Skeleton className="mb-2 h-7 w-full" />
+                            <Skeleton className="mb-4 h-5 w-full" />
+                            <Skeleton className="h-5 w-full" />
+                        </CardContent>
+                    </Card>
+                    <Card className="xl:col-span-2">
+                        <CardContent className="flex min-h-[50vh] w-full items-center justify-center">
+                            <Skeleton className="h-96 w-96 rounded-full" />
+                        </CardContent>
+                    </Card>
+                </section>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {Array.from({ length: 8 }).map((_, index) => (
+                        <Card key={index}>
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                        <Skeleton className="mb-2 h-7 w-40" />
+                                        <Skeleton className="h-5 w-full" />
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <Skeleton className="h-5 w-5" />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            </main>
+        </div>
     );
 }
