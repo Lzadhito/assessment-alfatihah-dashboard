@@ -9,6 +9,9 @@ class Login extends BaseLogin
 {
     public function mount(): void
     {
-        $this->redirect(Socialite::driver('keycloak')->stateless()->redirect()->getTargetUrl(), navigate: false);
+        /** @var \Laravel\Socialite\Two\AbstractProvider $provider */
+        $provider = Socialite::driver('keycloak');
+
+        $this->redirect($provider->stateless()->redirect()->getTargetUrl(), navigate: false);
     }
 }

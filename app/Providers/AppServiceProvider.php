@@ -36,7 +36,7 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function configureSocialite(): void
     {
-        Event::listen(SocialiteWasCalled::class, \SocialiteProviders\Keycloak\KeycloakExtendSocialite::class.'@handle');
+        Event::listen(SocialiteWasCalled::class, \SocialiteProviders\Keycloak\KeycloakExtendSocialite::class . '@handle');
     }
 
     /**
@@ -51,13 +51,13 @@ class AppServiceProvider extends ServiceProvider
         );
 
         Password::defaults(
-            fn (): ?Password => app()->isProduction()
+            fn(): ?Password => app()->isProduction()
                 ? Password::min(12)
-                    ->mixedCase()
-                    ->letters()
-                    ->numbers()
-                    ->symbols()
-                    ->uncompromised()
+                ->mixedCase()
+                ->letters()
+                ->numbers()
+                ->symbols()
+                ->uncompromised()
                 : null
         );
     }
