@@ -52,15 +52,15 @@ class EvaluationsTable
                     ->modifyQueryUsing(function (Builder $query, array $data): Builder {
                         return $query->when(
                             filled($data['nama_lengkap']),
-                            fn (Builder $q) => $q->whereHas(
+                            fn(Builder $q) => $q->whereHas(
                                 'user',
-                                fn (Builder $u) => $u->where('nama_lengkap', 'like', "%{$data['nama_lengkap']}%"),
+                                fn(Builder $u) => $u->where('nama_lengkap', 'like', "%{$data['nama_lengkap']}%"),
                             ),
                         );
                     })
                     ->indicateUsing(function (array $data): ?string {
                         if (filled($data['nama_lengkap'])) {
-                            return 'Nama: '.$data['nama_lengkap'];
+                            return 'Nama: ' . $data['nama_lengkap'];
                         }
 
                         return null;
@@ -69,7 +69,7 @@ class EvaluationsTable
                 SelectFilter::make('pemeriksa')
                     ->label('Pemeriksa')
                     ->options(
-                        fn () => Evaluation::query()
+                        fn() => Evaluation::query()
                             ->whereNotNull('pemeriksa')
                             ->distinct()
                             ->orderBy('pemeriksa')
@@ -81,7 +81,7 @@ class EvaluationsTable
                 SelectFilter::make('kegiatan')
                     ->label('Kegiatan')
                     ->options(
-                        fn () => Evaluation::query()
+                        fn() => Evaluation::query()
                             ->whereNotNull('kegiatan')
                             ->distinct()
                             ->orderBy('kegiatan')
@@ -99,18 +99,19 @@ class EvaluationsTable
                     ->modifyQueryUsing(function (Builder $query, array $data): Builder {
                         return $query->when(
                             filled($data['kode_unik']),
-                            fn (Builder $q) => $q->where('kode_unik', 'like', "%{$data['kode_unik']}%"),
+                            fn(Builder $q) => $q->where('kode_unik', 'like', "%{$data['kode_unik']}%"),
                         );
                     })
                     ->indicateUsing(function (array $data): ?string {
                         if (filled($data['kode_unik'])) {
-                            return 'Kode Unik: '.$data['kode_unik'];
+                            return 'Kode Unik: ' . $data['kode_unik'];
                         }
 
                         return null;
                     }),
             ])
             ->filtersLayout(\Filament\Tables\Enums\FiltersLayout::AboveContent)
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('created_at', 'desc')
+            ->recordUrl(fn(Evaluation $record): string => route('results', $record->uuid));
     }
 }

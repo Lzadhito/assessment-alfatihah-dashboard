@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\KeycloakController;
 use App\Http\Controllers\EvaluationController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -13,4 +14,9 @@ Route::get('dashboard', function () {
     return Inertia::render('dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-require __DIR__.'/settings.php';
+Route::prefix('auth/keycloak')->name('auth.keycloak.')->group(function () {
+    Route::get('redirect', [KeycloakController::class, 'redirect'])->name('redirect');
+    Route::get('callback', [KeycloakController::class, 'callback'])->name('callback');
+});
+
+require __DIR__ . '/settings.php';
