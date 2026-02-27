@@ -2,25 +2,18 @@
 
 namespace App\Providers;
 
-use App\Auth\Responses\KeycloakLogoutResponse;
 use Carbon\CarbonImmutable;
-use Filament\Auth\Http\Responses\Contracts\LogoutResponse;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
-use SocialiteProviders\Manager\SocialiteWasCalled;
 
 class AppServiceProvider extends ServiceProvider
 {
     /**
      * Register any application services.
      */
-    public function register(): void
-    {
-        $this->app->bind(LogoutResponse::class, KeycloakLogoutResponse::class);
-    }
+    public function register(): void {}
 
     /**
      * Bootstrap any application services.
@@ -28,15 +21,6 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
-        $this->configureSocialite();
-    }
-
-    /**
-     * Register Socialite providers.
-     */
-    protected function configureSocialite(): void
-    {
-        Event::listen(SocialiteWasCalled::class, \SocialiteProviders\Keycloak\KeycloakExtendSocialite::class . '@handle');
     }
 
     /**
@@ -51,13 +35,13 @@ class AppServiceProvider extends ServiceProvider
         );
 
         Password::defaults(
-            fn(): ?Password => app()->isProduction()
+            fn (): ?Password => app()->isProduction()
                 ? Password::min(12)
-                ->mixedCase()
-                ->letters()
-                ->numbers()
-                ->symbols()
-                ->uncompromised()
+                    ->mixedCase()
+                    ->letters()
+                    ->numbers()
+                    ->symbols()
+                    ->uncompromised()
                 : null
         );
     }

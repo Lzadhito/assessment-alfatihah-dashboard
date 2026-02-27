@@ -19,11 +19,11 @@ class EvaluationResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $navigationLabel = 'Evaluasi per Ayat';
+    protected static ?string $navigationLabel = 'Evaluasi';
 
-    protected static ?string $modelLabel = 'Evaluasi per Ayat';
+    protected static ?string $modelLabel = 'Evaluasi';
 
-    protected static ?string $pluralModelLabel = 'Evaluasi per Ayat';
+    protected static ?string $pluralModelLabel = 'Evaluasi';
 
     public static function form(Schema $schema): Schema
     {

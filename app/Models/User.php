@@ -38,7 +38,7 @@ class User extends Authenticatable
         'nama_lengkap',
         'nomor_wa',
         'pernah_hits',
-        'keycloak_id',
+        'role',
     ];
 
     /**
@@ -65,6 +65,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
             'pernah_hits' => 'boolean',
+            'role' => 'string',
         ];
     }
 
