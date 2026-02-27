@@ -17,6 +17,8 @@ Route::get('dashboard', function () {
 Route::prefix('auth/keycloak')->name('auth.keycloak.')->group(function () {
     Route::get('redirect', [KeycloakController::class, 'redirect'])->name('redirect');
     Route::get('callback', [KeycloakController::class, 'callback'])->name('callback');
+    Route::get('logout', [KeycloakController::class, 'logout'])->name('logout');
 });
+
 
 require __DIR__ . '/settings.php';

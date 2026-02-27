@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Auth\Responses\KeycloakLogoutResponse;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
 use Laravel\Socialite\Facades\Socialite;
 
 class KeycloakController extends Controller
@@ -31,25 +33,27 @@ class KeycloakController extends Controller
         $socialiteUser = Socialite::driver('keycloak')->stateless()->user();
 
         $user = User::query()
-            ->firstOrCreate(
-                ['keycloak_id' => $socialiteUser->getId()],
-                [
-                    'name' => $socialiteUser->getNickname() ?? $socialiteUser->getName(),
-                    'nama_lengkap' => $socialiteUser->getName(),
-                    'email' => $socialiteUser->getEmail(),
-                    'email_verified_at' => now(),
-                ]
-            );
+            ->where('email', $socialiteUser->getEmail())
+            ->first();
 
-        if (! $user->wasRecentlyCreated) {
-            $user->update([
-                'nama_lengkap' => $socialiteUser->getName() ?? $user->nama_lengkap,
-                'email' => $socialiteUser->getEmail() ?? $user->email,
-            ]);
+        if (! $user) {
+            Inertia::flash('error', 'Akun dengan email tersebut tidak ditemukan. Silakan hubungi admin untuk bantuan');
+            return redirect('/');
+        }
+
+        // Update keycloak_id if not set
+        if (! $user->keycloak_id) {
+            $user->keycloak_id = $socialiteUser->getId();
+            $user->save();
         }
 
         Auth::login($user, remember: true);
 
         return redirect()->intended(filament()->getPanel('admin')->getUrl());
+    }
+
+    public function logout(Request $request)
+    {
+        return (new KeycloakLogoutResponse())->toResponse($request);
     }
 }

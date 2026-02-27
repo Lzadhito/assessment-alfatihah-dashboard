@@ -1,11 +1,12 @@
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, usePage } from '@inertiajs/react';
+import { useEffect, useRef } from 'react';
 import {
     lookup,
     updateProfile,
 } from '@/actions/App/Http/Controllers/EvaluationController';
-import InputError from '@/components/ui/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import InputError from '@/components/ui/input-error';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 
@@ -19,6 +20,16 @@ type Props = {
 };
 
 export default function Home({ evaluation }: Props) {
+    const { flash } = usePage();
+    const rendered = useRef(false);
+
+    useEffect(() => {
+        if (flash.error && !rendered.current) {
+            alert(flash.error);
+            rendered.current = true;
+        }
+    }, [flash.error]);
+
     return (
         <>
             <Head title="Cek Hasil Evaluasi" />
